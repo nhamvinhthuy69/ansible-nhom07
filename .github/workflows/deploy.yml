@@ -66,7 +66,7 @@ jobs:
 
       - name: Ghi vault password
         run: |
-          echo "${{ secrets.VAULT_PASSWORD }}" > /tmp/.vault_pass
+          echo "${{ secrets.VAULT_PASSWORD }}" > $HOME/.vault_pass
           chmod 600 /tmp/.vault_pass
 
       - name: Chon playbook
@@ -92,13 +92,13 @@ jobs:
           TAG_ARG=""
           [ -n "$TAGS" ] && TAG_ARG="--tags $TAGS"
           ansible-playbook ${{ steps.plan.outputs.PB }} \
-            --vault-password-file /tmp/.vault_pass \
+            --vault-password-file $HOME/.vault_pass \
             $TAG_ARG -v
 
       - name: Verify ping tat ca host
         run: |
           ansible all \
-            --vault-password-file /tmp/.vault_pass \
+            --vault-password-file $HOME/.vault_pass \
             -m ping
 
       - name: Smoke test website
@@ -111,4 +111,4 @@ jobs:
 
       - name: Xoa vault password
         if: always()
-        run: rm -f /tmp/.vault_pass
+        run: rm -f $HOME/.vault_pass
