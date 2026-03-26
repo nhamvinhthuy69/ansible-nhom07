@@ -67,7 +67,7 @@ jobs:
       - name: Ghi vault password
         run: |
           echo "${{ secrets.VAULT_PASSWORD }}" > $HOME/.vault_pass
-          chmod 600 /tmp/.vault_pass
+          chmod 600 $HOME/.vault_pass
 
       - name: Chon playbook
         id: plan
@@ -83,7 +83,7 @@ jobs:
       - name: Syntax check
         run: |
           ansible-playbook ${{ steps.plan.outputs.PB }} \
-            --vault-password-file /tmp/.vault_pass \
+            --vault-password-file $HOME/.vault_pass \
             --syntax-check
 
       - name: Chay playbook
