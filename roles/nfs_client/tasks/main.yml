@@ -1,0 +1,25 @@
+---
+- name: Install NFS client
+  apt:
+    name: nfs-common
+    state: present
+    update_cache: yes
+  tags: nfs
+
+- name: Create mount point
+  file:
+    path: "{{ nfs_mount_path }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+  tags: nfs
+
+- name: Mount NFS share permanently
+  mount:
+    path: "{{ nfs_mount_path }}"
+    src: "{{ nfs_server_ip }}:{{ nfs_share_path }}"
+    fstype: nfs
+    opts: "rw,sync,hard,intr,_netdev"
+    state: mounted
+  tags: nfs

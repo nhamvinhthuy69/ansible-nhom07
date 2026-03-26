@@ -1,0 +1,9 @@
+---
+- name: Reload Nginx
+  service:
+    name: nginx
+    state: reloaded
+
+- name: Restart PHP-FPM
+  shell: systemctl restart php*-fpm
+  changed_when: true

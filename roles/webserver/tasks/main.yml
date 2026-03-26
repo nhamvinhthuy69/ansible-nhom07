@@ -1,0 +1,96 @@
+---
+- name: Install Nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+  tags: web
+
+- name: Install PHP-FPM and extensions
+  apt:
+    name:
+      - php-fpm
+      - php-mysql
+      - php-curl
+      - php-gd
+      - php-intl
+      - php-mbstring
+      - php-soap
+      - php-xml
+      - php-xmlrpc
+      - php-zip
+    state: present
+    update_cache: yes
+  tags: web
+
+- name: Detect PHP version
+  shell: "php -r 'echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;'"
+  register: _php_ver
+  changed_when: false
+  tags: web
+
+- name: Set php_version fact
+  set_fact:
+    php_version: "{{ _php_ver.stdout }}"
+    cacheable: yes
+  tags: web
+
+- name: Tune PHP settings
+  lineinfile:
+    path: "/etc/php/{{ php_version }}/fpm/php.ini"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: '^upload_max_filesize', line: 'upload_max_filesize = 64M' }
+    - { regexp: '^post_max_size',       line: 'post_max_size = 64M'       }
+    - { regexp: '^memory_limit',        line: 'memory_limit = 256M'       }
+    - { regexp: '^max_execution_time',  line: 'max_execution_time = 300'  }
+  notify: Restart PHP-FPM
+  tags: web
+
+- name: Remove default Nginx site
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/nginx/sites-enabled/default
+    - /etc/nginx/sites-available/default
+  notify: Reload Nginx
+  tags: web
+
+- name: Deploy WordPress Nginx config
+  template:
+    src: wordpress.conf.j2
+    dest: /etc/nginx/sites-available/wordpress.conf
+    mode: '0644'
+  notify: Reload Nginx
+  tags: web
+
+- name: Enable WordPress site
+  file:
+    src: /etc/nginx/sites-available/wordpress.conf
+    dest: /etc/nginx/sites-enabled/wordpress.conf
+    state: link
+  notify: Reload Nginx
+  tags: web
+
+- name: Allow HTTP
+  ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+  tags: web
+
+- name: Start Nginx
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+  tags: web
+
+- name: Start PHP-FPM
+  service:
+    name: "php{{ php_version }}-fpm"
+    state: started
+    enabled: yes
+  tags: web

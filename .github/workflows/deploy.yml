@@ -1,0 +1,60 @@
+name: "Ansible Deploy - nhom07"
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      playbook:
+        description: "Playbook to run"
+        required: true
+        default: site_task8.yml
+        type: choice
+        options: [site_task7.yml, site_task8.yml]
+
+jobs:
+  lint:
+    name: "Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ansible ansible-lint
+      - run: ansible-lint site_task7.yml --warn-list all || true
+      - run: ansible-lint site_task8.yml --warn-list all || true
+
+  deploy:
+    name: "Deploy"
+    runs-on: self-hosted
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write vault password
+        run: |
+          echo "${{ secrets.VAULT_PASSWORD }}" > /tmp/.vault_pass
+          chmod 600 /tmp/.vault_pass
+
+      - name: Pick playbook
+        id: plan
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "PB=${{ github.event.inputs.playbook }}" >> $GITHUB_OUTPUT
+          else
+            echo "PB=site_task8.yml" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Syntax check
+        run: ansible-playbook ${{ steps.plan.outputs.PB }} --vault-password-file /tmp/.vault_pass --syntax-check
+
+      - name: Run playbook
+        run: ansible-playbook ${{ steps.plan.outputs.PB }} --vault-password-file /tmp/.vault_pass -v
+
+      - name: Verify ping
+        run: ansible all --vault-password-file /tmp/.vault_pass -m ping
+
+      - name: Cleanup
+        if: always()
+        run: rm -f /tmp/.vault_pass

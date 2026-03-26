@@ -1,0 +1,38 @@
+---
+- name: Install HAProxy
+  apt:
+    name: haproxy
+    state: present
+    update_cache: yes
+  tags: haproxy
+
+- name: Deploy HAProxy config
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    mode: '0644'
+    validate: haproxy -c -f %s
+  notify: Restart HAProxy
+  tags: haproxy
+
+- name: Allow port 80
+  ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+  tags: haproxy
+
+- name: Allow port 8404 (stats) from internal only
+  ufw:
+    rule: allow
+    src: "{{ subnet }}"
+    port: '8404'
+    proto: tcp
+  tags: haproxy
+
+- name: Start HAProxy
+  service:
+    name: haproxy
+    state: started
+    enabled: yes
+  tags: haproxy

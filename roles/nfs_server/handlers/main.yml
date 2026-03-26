@@ -1,0 +1,8 @@
+---
+- name: Re-export shares
+  command: exportfs -ra
+
+- name: Restart NFS server
+  service:
+    name: nfs-kernel-server
+    state: restarted

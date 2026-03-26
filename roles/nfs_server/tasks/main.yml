@@ -1,0 +1,50 @@
+---
+- name: Install NFS server
+  apt:
+    name: [nfs-kernel-server, nfs-common]
+    state: present
+    update_cache: yes
+  tags: nfs
+
+- name: Create NFS export directory
+  file:
+    path: "{{ nfs_share_path }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+  tags: nfs
+
+- name: Set NFS thread count
+  lineinfile:
+    path: /etc/default/nfs-kernel-server
+    regexp: '^RPCNFSDCOUNT'
+    line: 'RPCNFSDCOUNT=8'
+    create: yes
+  notify: Restart NFS server
+  tags: nfs
+
+- name: Add NFS export entry
+  lineinfile:
+    path: /etc/exports
+    line: "{{ nfs_share_path }}  {{ subnet }}(rw,sync,no_subtree_check,no_root_squash)"
+    state: present
+    create: yes
+  notify: Re-export shares
+  tags: nfs
+
+- name: Allow NFS through firewall
+  ufw:
+    rule: allow
+    src: "{{ subnet }}"
+    port: "{{ item }}"
+    proto: tcp
+  loop: ['111', '2049']
+  tags: nfs
+
+- name: Start NFS server
+  service:
+    name: nfs-kernel-server
+    state: started
+    enabled: yes
+  tags: nfs

@@ -1,0 +1,11 @@
+$TTL 604800
+@   IN  SOA dns-server.{{ domain_name }}. admin.{{ domain_name }}. (
+            2024032401 604800 86400 2419200 604800 )
+@           IN  NS  dns-server.{{ domain_name }}.
+dns-server  IN  A   {{ dns_server_ip }}
+web01       IN  A   {{ web01_ip }}
+web02       IN  A   {{ web02_ip }}
+nfs         IN  A   {{ nfs_server_ip }}
+db          IN  A   {{ db_server_ip }}
+lb          IN  A   {{ haproxy_ip }}
+web         IN  A   {{ web_dns_target_ip }}

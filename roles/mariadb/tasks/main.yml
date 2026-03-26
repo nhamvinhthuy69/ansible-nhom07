@@ -1,0 +1,100 @@
+---
+- name: Install MariaDB and PyMySQL
+  apt:
+    name: [mariadb-server, python3-pymysql]
+    state: present
+    update_cache: yes
+  tags: db
+
+- name: Start MariaDB
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+  tags: db
+
+- name: Set root password
+  mysql_user:
+    name: root
+    password: "{{ db_root_password }}"
+    host_all: yes
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    state: present
+  no_log: true
+  ignore_errors: yes
+  tags: db
+
+- name: Remove anonymous users
+  mysql_user:
+    name: ''
+    host_all: yes
+    state: absent
+    login_user: root
+    login_password: "{{ db_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  no_log: true
+  tags: db
+
+- name: Remove test database
+  mysql_db:
+    name: test
+    state: absent
+    login_user: root
+    login_password: "{{ db_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  tags: db
+
+- name: Create WordPress database
+  mysql_db:
+    name: "{{ db_name }}"
+    collation: utf8mb4_unicode_ci
+    encoding: utf8mb4
+    state: present
+    login_user: root
+    login_password: "{{ db_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  tags: db
+
+- name: Create WordPress DB user
+  mysql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    priv: "{{ db_name }}.*:ALL"
+    host: "192.168.109.%"
+    state: present
+    login_user: root
+    login_password: "{{ db_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  no_log: true
+  tags: db
+
+- name: Allow remote connections
+  lineinfile:
+    path: /etc/mysql/mariadb.conf.d/50-server.cnf
+    regexp: '^bind-address'
+    line: 'bind-address = 0.0.0.0'
+  notify: Restart MariaDB
+  tags: db
+
+- name: Tune MariaDB performance
+  blockinfile:
+    path: /etc/mysql/mariadb.conf.d/50-server.cnf
+    insertafter: '\[mysqld\]'
+    marker: "# {mark} ANSIBLE MANAGED"
+    block: |
+      innodb_buffer_pool_size = 256M
+      innodb_log_file_size    = 64M
+      max_connections         = 150
+      max_allowed_packet      = 64M
+      query_cache_type        = 1
+      query_cache_size        = 32M
+  notify: Restart MariaDB
+  tags: db
+
+- name: Allow port 3306 from subnet
+  ufw:
+    rule: allow
+    src: "{{ subnet }}"
+    port: '3306'
+    proto: tcp
+  tags: db

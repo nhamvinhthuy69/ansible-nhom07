@@ -1,0 +1,46 @@
+---
+- name: "PLAY 1 | Configure BIND9 DNS"
+  hosts: dns_servers
+  become: yes
+  vars:
+    web_dns_target_ip: "{{ web01_ip }}"
+  roles:
+    - dns
+  tags: [dns]
+
+- name: "PLAY 2 | Set DNS resolver on all servers"
+  hosts: task7:web_servers
+  become: yes
+  roles:
+    - dns_client
+  tags: [dns]
+
+- name: "PLAY 3 | Deploy NFS Server"
+  hosts: nfs_servers
+  become: yes
+  roles:
+    - nfs_server
+  tags: [nfs]
+
+- name: "PLAY 4 | Deploy MariaDB Server"
+  hosts: db_servers
+  become: yes
+  roles:
+    - mariadb
+  tags: [db]
+
+- name: "PLAY 5 | Deploy Web Server on web01"
+  hosts: web01
+  become: yes
+  roles:
+    - nfs_client
+    - webserver
+    - wordpress
+  tags: [web, wordpress]
+
+- name: "PLAY 6 | Configure Backup"
+  hosts: nfs_servers:db_servers
+  become: yes
+  roles:
+    - backup
+  tags: [backup]

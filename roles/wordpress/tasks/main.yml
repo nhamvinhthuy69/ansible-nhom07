@@ -1,0 +1,157 @@
+---
+- name: Install wget and tar
+  apt:
+    name: [wget, tar]
+    state: present
+  tags: wordpress
+
+- name: Check if WordPress already deployed
+  stat:
+    path: "{{ nfs_mount_path }}/wp-settings.php"
+  register: wp_deployed
+  tags: wordpress
+
+- name: Download WordPress
+  get_url:
+    url: https://wordpress.org/latest.tar.gz
+    dest: /tmp/wordpress.tar.gz
+    timeout: 120
+  run_once: true
+  when: not wp_deployed.stat.exists
+  tags: wordpress
+
+- name: Extract WordPress
+  unarchive:
+    src: /tmp/wordpress.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  run_once: true
+  when: not wp_deployed.stat.exists
+  tags: wordpress
+
+- name: Copy WordPress to NFS share
+  shell: "cp -a /tmp/wordpress/. {{ nfs_mount_path }}/"
+  args:
+    creates: "{{ nfs_mount_path }}/wp-settings.php"
+  run_once: true
+  when: not wp_deployed.stat.exists
+  tags: wordpress
+
+- name: Set ownership
+  file:
+    path: "{{ nfs_mount_path }}"
+    owner: www-data
+    group: www-data
+    recurse: yes
+  run_once: true
+  tags: wordpress
+
+- name: Set directory permissions
+  shell: "find {{ nfs_mount_path }} -type d -exec chmod 755 {} +"
+  changed_when: false
+  run_once: true
+  tags: wordpress
+
+- name: Set file permissions
+  shell: "find {{ nfs_mount_path }} -type f -exec chmod 644 {} +"
+  changed_when: false
+  run_once: true
+  tags: wordpress
+
+- name: Check if wp-config.php exists
+  stat:
+    path: "{{ nfs_mount_path }}/wp-config.php"
+  register: wp_config
+  run_once: true
+  tags: wordpress
+
+- name: Create wp-config.php
+  copy:
+    src: "{{ nfs_mount_path }}/wp-config-sample.php"
+    dest: "{{ nfs_mount_path }}/wp-config.php"
+    remote_src: yes
+    owner: www-data
+    group: www-data
+    mode: '0640'
+  when: not wp_config.stat.exists
+  run_once: true
+  tags: wordpress
+
+- name: Configure DB_NAME
+  replace:
+    path: "{{ nfs_mount_path }}/wp-config.php"
+    regexp: "database_name_here"
+    replace: "{{ db_name }}"
+  when: not wp_config.stat.exists
+  run_once: true
+  tags: wordpress
+
+- name: Configure DB_USER
+  replace:
+    path: "{{ nfs_mount_path }}/wp-config.php"
+    regexp: "username_here"
+    replace: "{{ db_user }}"
+  when: not wp_config.stat.exists
+  run_once: true
+  tags: wordpress
+
+- name: Configure DB_PASSWORD
+  replace:
+    path: "{{ nfs_mount_path }}/wp-config.php"
+    regexp: "password_here"
+    replace: "{{ db_password }}"
+  when: not wp_config.stat.exists
+  run_once: true
+  no_log: true
+  tags: wordpress
+
+- name: Configure DB_HOST (remote MariaDB)
+  replace:
+    path: "{{ nfs_mount_path }}/wp-config.php"
+    regexp: "'DB_HOST', 'localhost'"
+    replace: "'DB_HOST', '{{ db_server_ip }}'"
+  when: not wp_config.stat.exists
+  run_once: true
+  tags: wordpress
+
+- name: Configure table prefix
+  replace:
+    path: "{{ nfs_mount_path }}/wp-config.php"
+    regexp: "\\$table_prefix = 'wp_';"
+    replace: "$table_prefix = '{{ wp_table_prefix }}';"
+  when: not wp_config.stat.exists
+  run_once: true
+  tags: wordpress
+
+- name: Inject WP_HOME and WP_SITEURL
+  blockinfile:
+    path: "{{ nfs_mount_path }}/wp-config.php"
+    insertafter: "define\\( 'DB_COLLATE'"
+    marker: "// {mark} ANSIBLE MANAGED"
+    block: |
+      define( 'WP_HOME',    'http://{{ web_domain }}' );
+      define( 'WP_SITEURL', 'http://{{ web_domain }}' );
+      define( 'FS_METHOD',  'direct' );
+  when: not wp_config.stat.exists
+  run_once: true
+  tags: wordpress
+
+- name: Create uploads directory
+  file:
+    path: "{{ nfs_mount_path }}/wp-content/uploads"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0775'
+  run_once: true
+  tags: wordpress
+
+- name: Clean up temp files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/wordpress.tar.gz
+    - /tmp/wordpress
+  run_once: true
+  tags: wordpress

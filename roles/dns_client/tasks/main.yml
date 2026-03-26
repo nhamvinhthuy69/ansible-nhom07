@@ -1,0 +1,19 @@
+---
+- name: Configure systemd-resolved
+  copy:
+    dest: /etc/systemd/resolved.conf
+    content: |
+      [Resolve]
+      DNS={{ dns_server_ip }}
+      Domains={{ domain_name }}
+      FallbackDNS=8.8.8.8
+  notify: Restart systemd-resolved
+  tags: dns
+
+- name: Link resolv.conf to stub resolver
+  file:
+    src: /run/systemd/resolve/stub-resolv.conf
+    dest: /etc/resolv.conf
+    state: link
+    force: yes
+  tags: dns

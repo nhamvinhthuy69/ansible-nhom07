@@ -1,0 +1,56 @@
+---
+- name: Install backup tools
+  apt:
+    name: [rsync, cron]
+    state: present
+  tags: backup
+
+- name: Create backup directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+  loop:
+    - "{{ backup_dir }}"
+    - "{{ backup_dir }}/db"
+    - "{{ backup_dir }}/nfs"
+  tags: backup
+
+- name: Deploy backup script
+  template:
+    src: backup.sh.j2
+    dest: /usr/local/bin/backup-nhom07.sh
+    mode: '0750'
+  tags: backup
+
+- name: Schedule daily DB backup at 02:00
+  cron:
+    name: "nhom07-db-backup"
+    minute: "0"
+    hour: "2"
+    job: "/usr/local/bin/backup-nhom07.sh db >> /var/log/backup-nhom07.log 2>&1"
+    state: present
+  when: "'db_servers' in group_names"
+  tags: backup
+
+- name: Schedule daily NFS backup at 03:00
+  cron:
+    name: "nhom07-nfs-backup"
+    minute: "0"
+    hour: "3"
+    job: "/usr/local/bin/backup-nhom07.sh nfs >> /var/log/backup-nhom07.log 2>&1"
+    state: present
+  when: "'nfs_servers' in group_names"
+  tags: backup
+
+- name: Schedule weekly full backup Sunday 01:00
+  cron:
+    name: "nhom07-weekly-full"
+    minute: "0"
+    hour: "1"
+    weekday: "0"
+    job: "/usr/local/bin/backup-nhom07.sh full >> /var/log/backup-nhom07.log 2>&1"
+    state: present
+  tags: backup
