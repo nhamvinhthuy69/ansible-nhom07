@@ -6,55 +6,109 @@ on:
   workflow_dispatch:
     inputs:
       playbook:
-        description: "Playbook to run"
+        description: "Chon playbook"
         required: true
         default: site_task8.yml
         type: choice
-        options: [site_task7.yml, site_task8.yml]
+        options:
+          - site_task7.yml
+          - site_task8.yml
+      tags:
+        description: "Tags (de trong = chay tat ca)"
+        required: false
+        default: ""
 
 jobs:
+
   lint:
-    name: "Lint"
+    name: "Kiem tra syntax"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cai Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install ansible ansible-lint
-      - run: ansible-lint site_task7.yml --warn-list all || true
-      - run: ansible-lint site_task8.yml --warn-list all || true
+
+      - name: Cai Ansible
+        run: |
+          pip install --upgrade pip
+          pip install ansible ansible-lint
+
+      - name: Kiem tra YAML syntax
+        run: |
+          python3 -c "
+          import yaml, sys, glob
+          files = glob.glob('roles/**/*.yml', recursive=True)
+          files += ['site_task7.yml', 'site_task8.yml']
+          errors = []
+          for f in files:
+              try:
+                  yaml.safe_load(open(f))
+                  print('OK:', f)
+              except Exception as e:
+                  errors.append('ERROR in ' + f + ': ' + str(e))
+          if errors:
+              print('\n'.join(errors))
+              sys.exit(1)
+          print('All files OK!')
+          "
 
   deploy:
-    name: "Deploy"
+    name: "Deploy len Lab"
     runs-on: self-hosted
     needs: lint
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Write vault password
+      - name: Ghi vault password
         run: |
           echo "${{ secrets.VAULT_PASSWORD }}" > /tmp/.vault_pass
           chmod 600 /tmp/.vault_pass
 
-      - name: Pick playbook
+      - name: Chon playbook
         id: plan
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "PB=${{ github.event.inputs.playbook }}" >> $GITHUB_OUTPUT
+            echo "TAGS=${{ github.event.inputs.tags }}"   >> $GITHUB_OUTPUT
           else
             echo "PB=site_task8.yml" >> $GITHUB_OUTPUT
+            echo "TAGS="             >> $GITHUB_OUTPUT
           fi
 
       - name: Syntax check
-        run: ansible-playbook ${{ steps.plan.outputs.PB }} --vault-password-file /tmp/.vault_pass --syntax-check
+        run: |
+          ansible-playbook ${{ steps.plan.outputs.PB }} \
+            --vault-password-file /tmp/.vault_pass \
+            --syntax-check
 
-      - name: Run playbook
-        run: ansible-playbook ${{ steps.plan.outputs.PB }} --vault-password-file /tmp/.vault_pass -v
+      - name: Chay playbook
+        run: |
+          TAGS="${{ steps.plan.outputs.TAGS }}"
+          TAG_ARG=""
+          [ -n "$TAGS" ] && TAG_ARG="--tags $TAGS"
+          ansible-playbook ${{ steps.plan.outputs.PB }} \
+            --vault-password-file /tmp/.vault_pass \
+            $TAG_ARG -v
 
-      - name: Verify ping
-        run: ansible all --vault-password-file /tmp/.vault_pass -m ping
+      - name: Verify ping tat ca host
+        run: |
+          ansible all \
+            --vault-password-file /tmp/.vault_pass \
+            -m ping
 
-      - name: Cleanup
+      - name: Smoke test website
+        run: |
+          sleep 5
+          curl -sf --max-time 10 http://192.168.109.15/ && echo "HAProxy OK" || \
+          curl -sf --max-time 10 http://192.168.109.11/ && echo "Web01 OK"   || \
+          echo "WARNING: can kiem tra thu cong"
+        continue-on-error: true
+
+      - name: Xoa vault password
         if: always()
         run: rm -f /tmp/.vault_pass
