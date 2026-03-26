@@ -7,6 +7,7 @@ global
     user haproxy
     group haproxy
     daemon
+    maxconn 50000
 
 defaults
     log     global
@@ -19,6 +20,7 @@ defaults
     timeout client  30s
     timeout server  30s
 
+# ── Stats dashboard ────────────────────────────────────────────────────────
 frontend stats
     bind *:8404
     stats enable
@@ -26,11 +28,19 @@ frontend stats
     stats refresh 10s
     stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
 
-frontend http_front
+# ── HTTP port 80: redirect tất cả sang HTTPS ──────────────────────────────
+frontend http_redirect
     bind *:80
-    http-request set-header X-Forwarded-Proto http
+    http-request redirect scheme https code 301
+
+# ── HTTPS port 443: SSL termination ───────────────────────────────────────
+frontend https_front
+    bind *:443 ssl crt /etc/ssl/nhom07/nhom07.pem
+    http-request set-header X-Forwarded-Proto https
+    http-request set-header X-Forwarded-Host  {{ web_domain }}
     default_backend wordpress_backend
 
+# ── Backend: web01 + web02 ─────────────────────────────────────────────────
 backend wordpress_backend
     balance roundrobin
     cookie SERVERID insert indirect nocache

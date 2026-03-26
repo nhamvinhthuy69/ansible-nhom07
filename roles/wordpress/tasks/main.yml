@@ -129,8 +129,8 @@
     insertafter: "define\\( 'DB_COLLATE'"
     marker: "// {mark} ANSIBLE MANAGED"
     block: |
-      define( 'WP_HOME',    'http://{{ web_domain }}' );
-      define( 'WP_SITEURL', 'http://{{ web_domain }}' );
+      define( 'WP_HOME',    'https://{{ web_domain }}' );
+      define( 'WP_SITEURL', 'https://{{ web_domain }}' );
       define( 'FS_METHOD',  'direct' );
   when: not wp_config.stat.exists
   run_once: true

@@ -1,0 +1,42 @@
+---
+- name: Install openssl
+  apt:
+    name: openssl
+    state: present
+  tags: ssl
+
+- name: Create SSL directory
+  file:
+    path: /etc/ssl/nhom07
+    state: directory
+    mode: '0755'
+  tags: ssl
+
+- name: Generate self-signed SSL certificate
+  command: >
+    openssl req -x509 -nodes -days 365
+    -newkey rsa:2048
+    -keyout /etc/ssl/nhom07/nhom07.key
+    -out    /etc/ssl/nhom07/nhom07.crt
+    -subj "/C=VN/ST=LamDong/L=DaLat/O=DLU/OU=nhom07/CN={{ web_domain }}"
+  args:
+    creates: /etc/ssl/nhom07/nhom07.crt
+  tags: ssl
+
+- name: Combine cert + key thành PEM (HAProxy cần)
+  shell: >
+    cat /etc/ssl/nhom07/nhom07.crt
+    /etc/ssl/nhom07/nhom07.key
+    > /etc/ssl/nhom07/nhom07.pem
+  args:
+    creates: /etc/ssl/nhom07/nhom07.pem
+  tags: ssl
+
+- name: Set permissions
+  file:
+    path: "{{ item }}"
+    mode: '0600'
+  loop:
+    - /etc/ssl/nhom07/nhom07.key
+    - /etc/ssl/nhom07/nhom07.pem
+  tags: ssl

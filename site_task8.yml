@@ -1,5 +1,5 @@
 ---
-- name: "PLAY 1 | Configure BIND9 DNS"
+- name: "PLAY 1 | BIND9 DNS"
   hosts: dns_servers
   become: yes
   vars:
@@ -8,28 +8,28 @@
     - dns
   tags: [dns]
 
-- name: "PLAY 2 | Set DNS resolver on all servers"
-  hosts: task8:web_servers
+- name: "PLAY 2 | DNS Client"
+  hosts: all
   become: yes
   roles:
     - dns_client
   tags: [dns]
 
-- name: "PLAY 3 | Deploy NFS Server"
+- name: "PLAY 3 | NFS Server"
   hosts: nfs_servers
   become: yes
   roles:
     - nfs_server
   tags: [nfs]
 
-- name: "PLAY 4 | Deploy MariaDB Server"
+- name: "PLAY 4 | MariaDB"
   hosts: db_servers
   become: yes
   roles:
     - mariadb
   tags: [db]
 
-- name: "PLAY 5 | Deploy Web Servers (web01 + web02)"
+- name: "PLAY 5 | Web Servers"
   hosts: web_servers
   become: yes
   roles:
@@ -38,14 +38,15 @@
     - wordpress
   tags: [web, wordpress]
 
-- name: "PLAY 6 | Deploy HAProxy Load Balancer"
+- name: "PLAY 6 | SSL Certificate + HAProxy"
   hosts: lb_servers
   become: yes
   roles:
+    - ssl
     - haproxy
-  tags: [lb, haproxy]
+  tags: [ssl, haproxy, lb]
 
-- name: "PLAY 7 | Configure Backup"
+- name: "PLAY 7 | Backup"
   hosts: nfs_servers:db_servers
   become: yes
   roles:

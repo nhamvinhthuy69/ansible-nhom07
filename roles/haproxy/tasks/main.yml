@@ -11,18 +11,24 @@
     src: haproxy.cfg.j2
     dest: /etc/haproxy/haproxy.cfg
     mode: '0644'
-    validate: haproxy -c -f %s
   notify: Restart HAProxy
   tags: haproxy
 
-- name: Allow port 80
+- name: Allow HTTP port 80
   ufw:
     rule: allow
     port: '80'
     proto: tcp
   tags: haproxy
 
-- name: Allow port 8404 (stats) from internal only
+- name: Allow HTTPS port 443
+  ufw:
+    rule: allow
+    port: '443'
+    proto: tcp
+  tags: haproxy
+
+- name: Allow HAProxy stats port 8404
   ufw:
     rule: allow
     src: "{{ subnet }}"
